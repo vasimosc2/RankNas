@@ -1,74 +1,144 @@
-# 📸 Image Recognition Project
+# RankNAS
 
-This project is designed for efficient image recognition and consists of four key files:
+RankNAS is a resource-aware Neural Architecture Search (NAS) framework for discovering efficient TakuNet models for image classification on constrained embedded devices, such as the Arduino Nano 33 BLE Sense.
 
-## 📂 Project Files
-1. **`main.py`** – The main script orchestrating the model's functionality.
-2. **`config.json`** – Defines the hyperparameter search space and training configuration.
-3. **`Training/train_and_evaluate.py`** – Handles model training and evaluation.
-4. **`models/takunet.py`** – Contains the Takunet model architecture.
+The project combines an evolutionary search strategy with an optional RankNet surrogate model to reduce the number of fully trained candidate architectures. Candidate models are evaluated using classification performance and deployment-related constraints such as RAM usage, flash memory usage, TFLite size, and training cost.
 
----
+## Main Features
 
-## 🛠 `config.json`: Model Configuration
-This JSON file dictates the hyperparameters and constraints for training, ensuring optimal model performance within resource limitations.
+- Evolutionary search for TakuNet architectures
+- Optional RankNet-based surrogate selection
+- Hardware-aware model filtering
+- CIFAR-100 image classification support
+- TFLite conversion and deployment-oriented evaluation
+- Pareto filtering based on accuracy, RAM, and flash memory
+- Result export for thesis experiments and comparison plots
+- Arduino deployment utilities
 
-### 🔹 **Model Architecture**
-- **`stages`** – Number of Takublocks in the model.
-- **`filters`** – Filters are small matrices that scan over an image to detect patterns like edges, textures, or shapes. 
-                  The number of filters determines how many different features the model can learn at each layer.
-                  More filters → The model learns more complex patterns but requires more computation.
-                  Fewer filters → Faster training, but might miss some details.
-                
-- **`kernel_size`** – The kernel size defines the height × width of the small matrix (filter) that moves across the image. 
-                      Common sizes include 3×3, 5×5, and 7×7.
-                      Smaller kernels (e.g., 3×3) → Better at detecting fine details like edges and textures.
-                      Larger kernels (e.g., 5×5, 7×7) → Capture bigger patterns but may miss fine details.
+## Repository Structure
 
-- **`activation`** – Activation function in convolutional layers.
-- **`strides`** – Step size for the convolutional filter.
-- **`dropout_rate`** – Probability of neuron dropout for overfitting prevention.
-- **`num_units`** – Neurons in fully connected (dense) layers.
-- **`dense_activation`** – Activation function for dense layers.
-- **`num_output_classes`** – Number of classification output classes.
+```text
+RankNas/
+├── Arduino/                    # Arduino deployment-related code
+├── Retrain/                    # Retraining utilities
+├── SurrogateComparisson/       # RankNet surrogate model and comparison logic
+├── plotting/                   # Scripts for visualizing results
+├── results/                    # Stored experiment results
+├── utils/                      # Helper utilities
+├── TakuNet.py                  # TakuNet model definition
+├── TrainBestModels.py          # Script for retraining selected models
+├── evolutionary_run.py         # Main NAS execution script
+├── search_strategy.py          # Evolutionary search implementation
+├── data_processing.py          # Dataset loading and preprocessing
+├── compute_ram_show.py         # RAM estimation utility
+├── config.json                 # Search space and training configuration
+└── env.sh                      # Environment setup helper
+```
 
-### 🔹 **Training Parameters**
-- **`optimizer`** – Optimization algorithm for training.
-- **`loss`** – Loss function (e.g., `categorical_crossentropy` for multi-class classification).
+## Configuration
 
-- **`learning_rate`** – The learning rate (LR) controls how much the model updates weights during training.
-                        High LR → Model learns fast but might overshoot the optimal point.
-                        Low LR → Model learns slowly but might get stuck in local minima.
-                        
-- **`num_epochs`** –  An epoch is one full pass through the entire dataset during training.
-                      Too few epochs → The model might underfit (not learn enough patterns).
-                      Too many epochs → The model might overfit (memorizing the training data instead of generalizing well to new data).
+The search space and training parameters are defined in `config.json`.
 
-- **`batch_size`** - Batch size refers to the number of training images processed before the model updates its weights.
-                     Smaller batch sizes → More frequent updates, more generalization, but slower training.
-                     Larger batch sizes → Faster training, but may lead to less generalization.
+The configuration includes:
 
-### 🔹 **Memory Constraints** *(Optimized for Arduino Nano 33 BLE Sense)*
-- **`max_ram_consumption`** – Maximum RAM usage (256 KB).
-- **`max_flash_consumption`** – Maximum flash memory (1 MB).
-- **`data_dtype_multiplier`** – Memory scaling based on data type (`int8`, thus `1`).
-- **`model_dtype_multiplier`** – Scaling factor for model precision.
+- Stem block parameters
+- Taku block/stage parameters
+- Downsampling parameters
+- Refiner block parameters
+- Optimizer choices
+- Training settings
+- Early stopping parameters
+- Adaptive dropout settings
+- RAM and flash memory constraints
 
----
-This structured configuration ensures streamlined model training while adhering to the hardware constraints of resource-limited environments 
-like the **Arduino Nano 33 BLE Sense**. 🚀
+The default setup is designed for CIFAR-100 classification and embedded deployment constraints.
 
 ## Setup
 
-To set up the environment, install the required dependencies:
-
-python3.11 -m venv venv
-or
-python -m venv venv
+Create and activate a Python virtual environment:
 
 ```bash
+python3.11 -m venv venv
 source venv/bin/activate
+```
+
+Install the required dependencies:
+
+```bash
 pip install --upgrade pip
 pip install -r requirements.txt
+```
 
-pip freeze
+## Running the NAS Search
+
+Run the default evolutionary search:
+
+```bash
+python evolutionary_run.py
+```
+
+Example with custom options:
+
+```bash
+python evolutionary_run.py \
+  --time 12 \
+  --population_size 6 \
+  --lr_strategy cosine \
+  --hardwareConstrains true \
+  --use_ranknet true
+```
+
+## Important Arguments
+
+| Argument | Description |
+|---|---|
+| `--time` | Total NAS search time in hours |
+| `--population_size` | Number of models per generation |
+| `--lr_strategy` | Learning-rate schedule: `cosine`, `linear`, or `step` |
+| `--hardwareConstrains` | Enables hardware-aware filtering |
+| `--performaceStoppage` | Enables performance-based stopping during training |
+| `--early_stopping_acc` | Enables accuracy-based early stopping |
+| `--midway_callback` | Enables midway training callback |
+| `--use_ranknet` | Enables or disables RankNet surrogate selection |
+
+## Outputs
+
+Each NAS run creates a dated experiment folder under:
+
+```text
+NAS/<date>/
+```
+
+The main outputs include:
+
+```text
+NAS/<date>/results/Best_Models_Results_NAS.csv
+NAS/<date>/results/Pareto_Optimal_Models.csv
+NAS/<date>/results/History/
+NAS/<date>/saved_models/
+```
+
+The Pareto-optimal models are also exported to:
+
+```text
+ThesisResults/
+```
+
+The Pareto filtering keeps models that are not dominated with respect to:
+
+- Test accuracy
+- Estimated RAM usage
+- Estimated flash memory usage
+
+## Hardware-Aware Search
+
+When hardware constraints are enabled, candidate architectures that exceed the configured RAM or flash limits are skipped before training. These limits are controlled in `config.json`.
+
+Default constraints include:
+
+- Maximum RAM consumption
+- Additional RAM overhead
+- Maximum flash consumption
+- Additional flash overhead
+- Data precision multiplier
+- Model precision multiplier
